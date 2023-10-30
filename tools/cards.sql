@@ -1,6 +1,5 @@
 CREATE TABLE "CARDS" (
                     "ID" INTEGER NOT NULL UNIQUE,
-                    "DBFID" INTEGER UNIQUE,
                     "CARDID" TEXT NOT NULL,
                     "CARDNAME" TEXT,
                     "CARDTEXT" TEXT,

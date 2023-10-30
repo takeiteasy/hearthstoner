@@ -47,15 +47,18 @@
       (setv result (+ result a)))
     result))
 
+(defn sanitize [string]
+  (.replace (.replace string "\"" "\"\"") "'" "''"))
+
 (defmacro process-card [card-strings card-tags]
   `(let [strings (lfor v **card-strings** v.name)
          string-values (dfor key **card-strings**
                              :setv value (get ~card-strings key)
                              key.name
                              (cond
-                               (not (len value)) "NULL" 
-                               (isinstance value str) value
-                               True (get value "enUS")))
+                               (not (len value)) None 
+                               (isinstance value str) (sanitize value)
+                               True (sanitize (get value "enUS"))))
          values (lfor v **card-values** v.name)
          card-values (dfor key **card-values**
                            key.name
@@ -79,11 +82,16 @@
                                       (let [data (process-card card.strings card.tags)]
                                         (setv
                                           (get data "ID") (getattr card "dbf_id")
-                                          (get data "DBFID") (getattr card "id")
+                                          (get data "CARDID") (getattr card "id")
                                           (get data "HERO_POWER") card.hero-power)
-                                        (when (get data "HERO_POWER")
-                                          (print data)
-                                          (sys.exit 0)))
+                                        (let [keys (lfor key (data.keys) f"\"{key}\"")
+                                              values (lfor value (data.values)
+                                                           (if (not value)
+                                                             "NULL"
+                                                             (if (isinstance value str)
+                                                               f"\"{value}\""
+                                                               (str value))))]
+                                            (.execute db f"INSERT INTO \"CARDS\" ({(.join "," keys)}) VALUES ({(.join "," values)});")))
                                       (.clear elem)
                                       (.clear root)))))
   (.commit db)
