@@ -4,7 +4,6 @@
 (import xml.etree [ElementTree])
 (import sqlite3)
 (import os)
-(import sys)
 
 (setv **card-strings** [GameTag.CARDNAME
                         GameTag.CARDTEXT
@@ -70,29 +69,24 @@
 (let [db (sqlite3.connect "cards.db")]
   (exec-sql-files "cards.sql" "mechanics.sql" "mapping.sql")
   (let [fh (open "hsdata/CardDefs.xml" "rb")
-        context (ElementTree.iterparse fh :events ["start" "end"])
-        root None]
+        context (ElementTree.iterparse fh :events ["end"])]
     (for [[action elem] context]
-      (cond
-        (and (= action "start")
-             (= elem.tag "CardDefs")) (setv root elem)
-        (and (= action "end")
-             (= elem.tag "Entity")) (let [card (cardxml.CardXML.from-xml elem)]
-                                      (setv card.locale "enUS")
-                                      (let [data (process-card card.strings card.tags)]
-                                        (setv
-                                          (get data "ID") (getattr card "dbf_id")
-                                          (get data "CARDID") (getattr card "id")
-                                          (get data "HERO_POWER") card.hero-power)
-                                        (let [keys (lfor key (data.keys) f"\"{key}\"")
-                                              values (lfor value (data.values)
-                                                           (if (not value)
-                                                             "NULL"
-                                                             (if (isinstance value str)
-                                                               f"\"{value}\""
-                                                               (str value))))]
-                                            (.execute db f"INSERT INTO \"CARDS\" ({(.join "," keys)}) VALUES ({(.join "," values)});")))
-                                      (.clear elem)
-                                      (.clear root)))))
+      (when (and (= action "end")
+                 (= elem.tag "Entity"))
+        (let [card (cardxml.CardXML.from-xml elem)]
+          (setv card.locale "enUS")
+          (let [data (process-card card.strings card.tags)]
+            (setv
+              (get data "ID") (getattr card "dbf_id")
+              (get data "CARDID") (getattr card "id")
+              (get data "HERO_POWER") card.hero-power)
+            (let [keys (lfor key (data.keys) f"\"{key}\"")
+                  values (lfor value (data.values)
+                              (if (not value)
+                                "NULL"
+                                (if (isinstance value str)
+                                  f"\"{value}\""
+                                  (str value))))]
+              (.execute db f"INSERT INTO \"CARDS\" ({(.join "," keys)}) VALUES ({(.join "," values)});")))))))
   (.commit db)
   (.close db))
