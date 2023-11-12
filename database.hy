@@ -87,13 +87,11 @@
                           GameTag.SPARE_PART
                           GameTag.FORGETFUL
                           GameTag.HEROPOWER_DAMAGE])
-
-(defmacro exec-sql-file [path]
-  `(.execute db (.read (open (+ "tools/" ~path) "r"))))
-
-(defmacro exec-sql-files [#* paths]
-  `(for [p [~@paths]]
-     (exec-sql-file p)))
+(setv **extra-values** [GameTag.HERO_POWER
+                        GameTag.SPELLPOWER
+                        GameTag.OVERLOAD
+                        GameTag.WINDFURY
+                        GameTag.MANATHIRST])
 
 (when (os.path.exists "cards.db")
   (os.remove "cards.db"))
@@ -121,14 +119,14 @@
                            key.name
                            (if (in key ~card-tags)
                              (get ~card-tags key)
-                             None))
-         mechanics (lfor tag ~card-tags
-                         :if (in tag **card-mechanics**)
-                         tag)]
+                             None))]
      (| string-values card-values)))
 
 (let [db (sqlite3.connect "cards.db")]
-  (exec-sql-files "cards.sql" "mechanics.sql" "mapping.sql")
+  (for [fname (os.scandir "sql")]
+    (when (and (.is-file fname)
+               (= (fname.name.endswith "sql")))
+      (.execute db (.read (open (+ "sql/" fname.name) "r")))))
   (for [mechanic **card-mechanics**]
     (.execute db f"INSERT INTO \"MECHANICS\" (\"TAGID\", \"NAME\") VALUES ({(int mechanic)}, \"{mechanic.name}\");"))
   (let [fh (open "hsdata/CardDefs.xml" "rb")
@@ -149,7 +147,14 @@
                                 "NULL"
                                 (if (isinstance value str)
                                   f"\"{value}\""
-                                  (str value))))]
-              (.execute db f"INSERT INTO \"CARDS\" ({(.join "," keys)}) VALUES ({(.join "," values)});")))))))
+                                  (str value))))
+                  mechanics (lfor [k v] (.items card.tags)
+                                  :if (in k **card-mechanics**)
+                                  f"(\"{(get data "CARDID")}\", {(int k)})")]
+              (when (len mechanics)
+                (.execute db f"INSERT INTO \"MAPPING\" VALUES {(.join "," mechanics)};"))
+              (.execute db f"INSERT INTO \"CARDS\" ({(.join "," keys)}) VALUES ({(.join "," values)});"))
+            
+            )))))
   (.commit db)
   (.close db))

@@ -7,5 +7,5 @@ if [ $LOCAL = $REMOTE ]; then
     git pull
     cd ../
     rm cards.db
-    python3 -m hy tools/database.hy
+    python3 -m hy database.hy
 fi
